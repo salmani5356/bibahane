@@ -1,0 +1,7 @@
+{
+  "appId": "app.bibahane",
+  "appName": "بی‌بهانه",
+  "webDir": "www",
+  "android": { "backgroundColor": "#16213A" },
+  "plugins": { "LocalNotifications": { "iconColor": "#0E7C6B" } }
+}

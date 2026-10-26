@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>بی‌بهانه</title>
+<style>
+@font-face{font-family:'Vazirmatn';font-weight:400;font-display:swap;src:url(fonts/vazirmatn-arabic-400-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE80-FEFC}
+@font-face{font-family:'Vazirmatn';font-weight:700;font-display:swap;src:url(fonts/vazirmatn-arabic-700-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE80-FEFC}
+@font-face{font-family:'Vazirmatn';font-weight:800;font-display:swap;src:url(fonts/vazirmatn-arabic-800-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE80-FEFC}
+@font-face{font-family:'Vazirmatn';font-weight:400;font-display:swap;src:url(fonts/vazirmatn-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Vazirmatn';font-weight:700 800;font-display:swap;src:url(fonts/vazirmatn-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* Layout: one column, today's list on top, one tap to add, a full-screen gate when a task is due */
+:root{
+  color-scheme:light;
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#16213A; --muted:#5B6781; --line:#D6DCE6;
+  --accent:#0E7C6B; --accent-ink:#FFFFFF; --warn:#B45309; --bad:#B42318;
+  --over-bg:#16213A; --over-fg:#F3F6FB; --over-muted:#A9B4CC; --over-btn:#FFFFFF; --over-btn-ink:#16213A;
+  --font:'Vazirmatn',Tahoma,'Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#0F1524; --surface:#18203A; --ink:#E8ECF5; --muted:#9AA6C0; --line:#2A3556;
+    --accent:#2FB59F; --accent-ink:#06201B; --warn:#F2A64A; --bad:#F2796B;
+    --over-bg:#070B16; --over-fg:#F3F6FB; --over-muted:#8F9BB8; --over-btn:#2FB59F; --over-btn-ink:#06201B;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0; min-height:100%}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font); font-size:16px; line-height:1.6;
+  direction:rtl; text-align:right; -webkit-tap-highlight-color:transparent;
+  padding-top:calc(20px + env(safe-area-inset-top, 0px));
+  padding-bottom:140px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+button,input{font-family:inherit; font-size:inherit; color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.wrap{max-width:560px; margin:0 auto; display:flex; flex-direction:column; gap:18px}
+
+.top{display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
+header h1{margin:0; font-size:1.7rem; font-weight:800; letter-spacing:-.01em; text-wrap:balance}
+header .date{color:var(--muted); font-size:.95rem}
+.music{border:1px solid var(--line); background:var(--surface); border-radius:99px; padding:8px 14px; font-size:.88rem; font-weight:700; white-space:nowrap}
+.music[aria-pressed=true]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.progress{display:flex; align-items:center; gap:12px}
+.bar{flex:1; height:8px; border-radius:99px; background:var(--line); overflow:hidden}
+.bar i{display:block; height:100%; background:var(--accent); width:0; transition:width .4s}
+.progress span{font-size:.9rem; color:var(--muted); white-space:nowrap}
+
+.quote{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px}
+.quote .lab{font-size:.78rem; color:var(--muted); letter-spacing:.02em}
+.quote p{margin:4px 0 0; font-size:1.08rem; font-weight:700; text-wrap:balance}
+
+.hint{background:var(--surface); border:1px dashed var(--line); border-radius:12px; padding:12px 14px; display:flex; gap:12px; align-items:center; justify-content:space-between; font-size:.9rem; color:var(--muted)}
+.hint button{background:none; border:0; color:var(--accent); font-weight:700; padding:6px 8px; white-space:nowrap}
+.hint.warn{border-color:var(--warn); color:var(--ink)}
+.hint.warn button{color:var(--warn)}
+
+.list{display:flex; flex-direction:column; gap:10px; padding:0; margin:0; list-style:none}
+.task{width:100%; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center; text-align:right;
+  background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px}
+.task .time{font-weight:800; font-size:1.05rem; font-variant-numeric:tabular-nums; min-width:3.4rem}
+.task .name{font-weight:700; min-width:0; overflow-wrap:anywhere}
+.task .meta{font-size:.82rem; color:var(--muted); font-weight:400}
+.task .st{width:30px; height:30px; border-radius:50%; display:grid; place-items:center; border:2px solid var(--line); color:transparent}
+.task.done .st{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.task.skip .st{border-color:var(--bad); color:var(--bad)}
+.task.skip .name{color:var(--muted); text-decoration:line-through}
+.task.late .time{color:var(--warn)}
+.task.done .name{color:var(--muted)}
+.streak{display:inline-block; margin-inline-start:8px; padding:0 8px; border-radius:99px; font-size:.78rem; font-weight:700; color:var(--accent); border:1px solid var(--accent)}
+.empty{padding:28px 16px; text-align:center; color:var(--muted); background:var(--surface); border:1px dashed var(--line); border-radius:14px}
+
+.dock{position:fixed; inset-inline:0; bottom:0; padding:12px max(16px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(to top, var(--bg) 70%, transparent)}
+.dock .in{max-width:560px; margin:0 auto}
+.btn{display:block; width:100%; border:0; border-radius:14px; padding:15px 18px; font-weight:800; font-size:1.05rem; background:var(--accent); color:var(--accent-ink)}
+.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+.btn.danger{background:transparent; color:var(--bad); border:1px solid var(--line)}
+
+.scrim{position:fixed; inset:0; background:rgba(8,12,24,.55); z-index:20; display:flex; align-items:flex-end; justify-content:center}
+.scrim[hidden],.gate[hidden]{display:none}
+.sheet{width:100%; max-width:560px; max-height:92%; overflow-y:auto; background:var(--surface); border-radius:20px 20px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:16px}
+.sheet h2{margin:0; font-size:1.25rem}
+.field{display:flex; flex-direction:column; gap:6px; min-width:0}
+.field label,.field .lab{font-size:.85rem; color:var(--muted); font-weight:400}
+.field input[type=text],.field input[type=time]{width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line); background:var(--bg); font-size:1.05rem; direction:rtl}
+.field input[type=time]{text-align:right; font-variant-numeric:tabular-nums}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{border:1px solid var(--line); background:var(--bg); border-radius:99px; padding:8px 16px; font-weight:400}
+.chip[aria-pressed=true]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
+.chip.day{min-width:44px; padding:8px 0; text-align:center}
+.note{font-size:.85rem; color:var(--muted); margin:0}
+
+.gate{position:fixed; inset:0; z-index:50; background:var(--over-bg); color:var(--over-fg);
+  display:flex; flex-direction:column; justify-content:center;
+  padding-top:calc(28px + env(safe-area-inset-top, 0px)); padding-bottom:calc(28px + env(safe-area-inset-bottom, 0px));
+  padding-left:max(24px, env(safe-area-inset-left, 0px)); padding-right:max(24px, env(safe-area-inset-right, 0px));
+  overflow-y:auto}
+.gate .in{max-width:520px; width:100%; margin:0 auto; display:flex; flex-direction:column; gap:22px}
+.gate .tag{font-size:.9rem; color:var(--over-muted); letter-spacing:.02em}
+.gate h2{margin:0; font-size:clamp(2.2rem, 11vw, 3.4rem); line-height:1.25; font-weight:800; text-wrap:balance; overflow-wrap:anywhere}
+.gate p{margin:0; color:var(--over-muted); font-size:1.05rem}
+.gate .clock{font-size:clamp(3.4rem, 22vw, 6rem); font-weight:800; font-variant-numeric:tabular-nums; direction:ltr; text-align:center; line-height:1}
+.gate .go{border:0; border-radius:16px; padding:20px; font-size:1.35rem; font-weight:800; background:var(--over-btn); color:var(--over-btn-ink)}
+.gate .go.alt{background:transparent; color:var(--over-fg); border:2px solid var(--over-muted)}
+.gate .no{border:0; background:none; color:var(--over-muted); padding:14px; font-size:1rem; text-decoration:underline; text-underline-offset:4px}
+.gate .two{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.gate .exit{align-self:flex-start; border:0; background:none; color:var(--over-muted); font-size:.9rem; padding:4px 0; text-decoration:underline}
+@media (prefers-reduced-motion:no-preference){ .gate{animation:fadein .25s ease-out} @keyframes fadein{from{opacity:0}to{opacity:1}} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="dock"><div class="in"><button class="btn" id="add" type="button">+ کار جدید</button></div></div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="gate" id="gate" hidden role="alertdialog" aria-live="assertive"></div>
+
+<script>
+(function(){
+  var KEY='bibahane.v1', S, ed=null, testId=null, sureFor=null, lastSig='', delArm=false, perm='unknown';
+  var FA='۰۱۲۳۴۵۶۷۸۹';
+  var NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+  var LN=NATIVE&&window.Capacitor.Plugins?window.Capacitor.Plugins.LocalNotifications:null;
+
+  function fa(s){return String(s).replace(/\d/g,function(d){return FA[d]})}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+  function pad(n){return (n<10?'0':'')+n}
+  function dk(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+  function mins(t){var p=t.split(':');return (+p[0])*60+(+p[1])}
+  function nowMin(){var d=new Date();return d.getHours()*60+d.getMinutes()}
+  function uid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+
+  /* ---------- daily lines ---------- */
+  var QUOTES=[
+    'شروع کردن از فکر کردن به شروع کردن آسون‌تره.',
+    'فقط پنج دقیقه. بقیه‌اش خودش میاد.',
+    'امروز لازم نیست عالی باشی، فقط لازمه بیای.',
+    'هر بار که انجامش می‌دی، به خودت ثابت می‌کنی حرفت حساب داره.',
+    'کار امروز رو به فردایی که خسته‌تره نسپار.',
+    'انگیزه بعد از شروع میاد، نه قبلش.',
+    'کوچیک شروع کن، ولی امروز شروع کن.',
+    'زنجیره‌ات رو نشکن. یک روز دیگه بهش اضافه کن.',
+    'فردا از خودت ممنون می‌شی که امروز انجامش دادی.',
+    'بهانه همیشه آماده‌ست. تو هم می‌تونی آماده‌تر باشی.',
+    'سخت‌ترین قسمت بلند شدنه. بلند شو.',
+    'کاری که عقب انداختی، از خودش سنگین‌تر شده.',
+    'آدم‌ها با تکرار ساخته می‌شن، نه با تصمیم‌های بزرگ.',
+    'امروز یک قدم کوچیک جلو برو، حتی اگه کند باشه.',
+    'لازم نیست حالت خوب باشه تا شروع کنی. شروع کن تا حالت خوب بشه.',
+    'هر کاری که تموم می‌کنی، یک بار کمتر مجبوری بهش فکر کنی.',
+    'به خودت قول داده بودی. حالا وقتشه.',
+    'دیر شروع کردن بهتر از هیچ‌وقت شروع نکردنه.',
+    'یک کار تموم‌شده از ده کار فکرشده ارزشمندتره.',
+    'امروز رو طوری بساز که شب راحت بخوابی.',
+    'اگه سخته، یعنی داری رشد می‌کنی.',
+    'منتظر موندن برای حال خوب، یعنی هیچ‌وقت شروع نکردن.',
+    'فقط روی همین ده دقیقه تمرکز کن.',
+    'هر روزی که انجام بدی، بیشتر شبیه آدمی می‌شی که می‌خوای باشی.',
+    'تنبلی فقط لحظه اول رو می‌گیره. بعدش با توئه.',
+    'پیشرفت یعنی امروز یک کم بهتر از دیروز.',
+    'ببین چقدر راه اومدی. قطعش نکن.',
+    'کار امروز رو امروز تموم کن و با خیال راحت استراحت کن.',
+    'گوشی رو بذار کنار و شروع کن.',
+    'فقط اولین حرکت رو انجام بده.',
+    'چیزی که ازش فرار می‌کنی، با فرار کردن بزرگ‌تر می‌شه.',
+    'خودت رو دست‌کم نگیر. می‌تونی.',
+    'این کار رو برای خودِ فردات انجام بده.',
+    'ادامه دادن مهم‌تر از کامل بودنه.',
+    'امروز به خودت یک «بله» بگو.',
+    'وقتی تموم شد، حس خوبش رو یادت می‌مونه.',
+    'دو دقیقه که شروع کنی، می‌بینی ادامه دادنش سخت نیست.',
+    'نظم یعنی هر روز، بدون منتظر موندن برای حال و حوصله.',
+    'تو از بهانه‌هات قوی‌تری.'
+  ];
+  function quoteFor(d){
+    var n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000);
+    return QUOTES[n%QUOTES.length];
+  }
+
+  /* ---------- storage ---------- */
+  function seed(){
+    var c=Date.now();
+    return [
+      {id:uid()+'a',title:'ورزش',time:'07:30',days:[],once:null,dur:20,created:c},
+      {id:uid()+'b',title:'مطالعه',time:'20:00',days:[],once:null,dur:30,created:c}
+    ];
+  }
+  function load(){
+    try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+    if(!S||!S.tasks){S={tasks:seed(),log:{},run:null,hint:true,music:true}}
+    if(S.music===undefined) S.music=true;
+  }
+  var schedT=null;
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} clearTimeout(schedT); schedT=setTimeout(reschedule,400)}
+
+  function occurs(t,d){
+    if(t.once) return t.once===dk(d);
+    if(t.days&&t.days.length) return t.days.indexOf(d.getDay())>-1;
+    return true;
+  }
+  function getLog(id,key){return (S.log[id]||{})[key]}
+  function setLog(id,key,v){(S.log[id]=S.log[id]||{})[key]=v}
+  function startsToday(t){
+    var cd=new Date(t.created||0);
+    if(dk(cd)!==dk(new Date())) return true;
+    return mins(t.time)>cd.getHours()*60+cd.getMinutes();
+  }
+  function byId(id){for(var i=0;i<S.tasks.length;i++) if(S.tasks[i].id===id) return S.tasks[i]; return null}
+  function dueTask(){
+    if(testId) return byId(testId);
+    if(S.run) return byId(S.run.id);
+    var today=new Date(), key=dk(today), nm=nowMin();
+    var list=S.tasks.slice().sort(function(a,b){return mins(a.time)-mins(b.time)});
+    for(var i=0;i<list.length;i++){
+      var t=list[i];
+      if(occurs(t,today)&&!getLog(t.id,key)&&mins(t.time)<=nm&&startsToday(t)) return t;
+    }
+    return null;
+  }
+  function streak(t){
+    var d=new Date(), n=0, first=true;
+    for(var i=0;i<400;i++){
+      if(occurs(t,d)){
+        var v=getLog(t.id,dk(d));
+        if(v==='done') n++;
+        else if(first&&!v){} else break;
+        first=false;
+      }
+      d.setDate(d.getDate()-1);
+    }
+    return n;
+  }
+
+  /* ---------- offline alarms (native) ---------- */
+  async function setupChannel(){
+    if(!LN) return;
+    try{await LN.createChannel({id:'alarm',name:'یادآور کارها',description:'زنگ و هشدار کارهای روزانه',importance:5,visibility:1,vibration:true})}catch(e){}
+  }
+  async function checkPerm(){
+    if(!LN) return;
+    try{var r=await LN.checkPermissions(); perm=r.display}catch(e){}
+    if(!ed) render();
+  }
+  async function enableAlarms(){
+    if(!LN) return;
+    try{var r=await LN.requestPermissions(); perm=r.display}catch(e){}
+    try{var x=await LN.checkExactNotificationSetting(); if(x&&x.exact_alarm==='denied') await LN.changeExactNotificationSetting()}catch(e){}
+    await setupChannel(); reschedule(); if(!ed) render();
+  }
+  var busy=false, again=false;
+  async function reschedule(){
+    if(!LN) return;
+    if(busy){again=true; return}
+    busy=true;
+    try{
+      var p=await LN.getPending();
+      if(p.notifications&&p.notifications.length) await LN.cancel({notifications:p.notifications.map(function(n){return {id:n.id}})});
+      var out=[], id=1, now=Date.now();
+      for(var off=0; off<14; off++){
+        var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+off);
+        S.tasks.forEach(function(t){
+          if(!occurs(t,d)) return;
+          if(off===0&&(getLog(t.id,dk(d))||!startsToday(t))) return;
+          var hm=t.time.split(':'), at=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+hm[0],+hm[1],0);
+          if(at.getTime()>now){
+            out.push({id:id++,title:t.title,body:quoteFor(d),channelId:'alarm',schedule:{at:at,allowWhileIdle:true},extra:{taskId:t.id}});
+          }
+          if(off<=2){
+            [10,20].forEach(function(m){
+              var a2=new Date(at.getTime()+m*60000);
+              if(a2.getTime()>now) out.push({id:id++,title:'هنوز شروع نکردی: '+t.title,body:'فقط پنج دقیقه. برنامه رو باز کن.',channelId:'alarm',schedule:{at:a2,allowWhileIdle:true},extra:{taskId:t.id}});
+            });
+          }
+        });
+      }
+      for(var i=0;i<out.length;i+=40) await LN.schedule({notifications:out.slice(i,i+40)});
+    }catch(e){}
+    busy=false;
+    if(again){again=false; reschedule()}
+  }
+
+  /* ---------- soft background music (generated, no beat) ---------- */
+  var Music={ctx:null,master:null,timer:null,playing:false,idx:3,previewT:null,
+    scale:[220,261.63,293.66,329.63,392,440,523.25,587.33],
+    ensure:function(){
+      if(this.ctx) return true;
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+      var c=this.ctx=new AC(), m=this.master=c.createGain(); m.gain.value=0;
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200;
+      var dl=c.createDelay(1.5); dl.delayTime.value=.46;
+      var fb=c.createGain(); fb.gain.value=.38;
+      var wet=c.createGain(); wet.gain.value=.5;
+      m.connect(lp); lp.connect(c.destination);
+      m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(lp);
+      return true;
+    },
+    note:function(f,vel){
+      var c=this.ctx, t=c.currentTime, g=c.createGain();
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(.2*vel,t+.03);
+      g.gain.exponentialRampToValueAtTime(.0001,t+4.2);
+      var o1=c.createOscillator(); o1.type='sine'; o1.frequency.value=f;
+      var o2=c.createOscillator(); o2.type='triangle'; o2.frequency.value=f*2;
+      var g2=c.createGain(); g2.gain.value=.18;
+      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.master);
+      o1.start(t); o2.start(t); o1.stop(t+4.4); o2.stop(t+4.4);
+    },
+    next:function(){
+      if(!this.playing) return;
+      var step=[-2,-1,-1,1,1,2][Math.floor(Math.random()*6)];
+      this.idx=Math.max(0,Math.min(this.scale.length-1,this.idx+step));
+      this.note(this.scale[this.idx],.7+Math.random()*.3);
+      if(Math.random()<.22) this.note(this.scale[Math.max(0,this.idx-2)],.5);
+      var self=this; this.timer=setTimeout(function(){self.next()},1900+Math.random()*2600);
+    },
+    start:function(){
+      if(!S.music||this.playing||!this.ensure()) return;
+      try{this.ctx.resume()}catch(e){}
+      this.playing=true;
+      this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.master.gain.setTargetAtTime(.35,this.ctx.currentTime,.6);
+      this.next();
+    },
+    stop:function(){
+      if(!this.playing) return;
+      this.playing=false; clearTimeout(this.timer); clearTimeout(this.previewT);
+      try{this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.5)}catch(e){}
+    },
+    preview:function(){
+      this.start(); var self=this; clearTimeout(this.previewT);
+      this.previewT=setTimeout(function(){ if(!(S.run&&S.run.phase==='run')) self.stop() },15000);
+    }
+  };
+
+  /* ---------- rendering ---------- */
+  var DAYS=[[6,'ش'],[0,'ی'],[1,'د'],[2,'س'],[3,'چ'],[4,'پ'],[5,'ج']];
+  var DAYN={6:'شنبه',0:'یکشنبه',1:'دوشنبه',2:'سه‌شنبه',3:'چهارشنبه',4:'پنجشنبه',5:'جمعه'};
+  function repeatText(t){
+    if(t.once) return 'یک بار';
+    if(t.days&&t.days.length&&t.days.length<7) return DAYS.filter(function(x){return t.days.indexOf(x[0])>-1}).map(function(x){return DAYN[x[0]]}).join('، ');
+    return 'هر روز';
+  }
+  var CHECK='<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var CROSS='<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+  function render(){
+    var today=new Date(), key=dk(today), nm=nowMin();
+    var list=S.tasks.filter(function(t){return occurs(t,today)}).sort(function(a,b){return mins(a.time)-mins(b.time)});
+    var done=list.filter(function(t){return getLog(t.id,key)==='done'}).length;
+    var dateStr=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{weekday:'long',day:'numeric',month:'long'}).format(today);
+    var h='<header class="top"><div><h1>بی‌بهانه</h1><div class="date">'+esc(dateStr)+'</div></div>'
+      +'<button class="music" type="button" data-act="music" aria-pressed="'+(!!S.music)+'">موسیقی '+(S.music?'روشن':'خاموش')+'</button></header>';
+    h+='<div class="progress"><div class="bar"><i style="width:'+(list.length?Math.round(done/list.length*100):0)+'%"></i></div><span>'+fa(done)+' از '+fa(list.length)+' انجام شد</span></div>';
+    h+='<div class="quote"><div class="lab">جمله امروز</div><p>'+esc(quoteFor(today))+'</p></div>';
+    if(LN&&perm!=='granted'&&perm!=='unknown'){
+      h+='<div class="hint warn"><span>برای اینکه سر وقت زنگ بزنه، اجازه نوتیفیکیشن و آلارم لازمه.</span><button type="button" data-act="perm">فعال‌سازی</button></div>';
+    }
+    if(S.hint&&S.tasks.length){
+      h+='<div class="hint"><span>این دو کار نمونه‌اند. روی هر کدام بزن تا ویرایش یا حذفش کنی.</span><button type="button" data-act="hint">باشه</button></div>';
+    }
+    if(!list.length){
+      h+='<div class="empty">برای امروز کاری نداری. با دکمه پایین یک کار بساز.</div>';
+    }else{
+      h+='<ul class="list">';
+      list.forEach(function(t){
+        var v=getLog(t.id,key), cls=v==='done'?'done':v==='skip'?'skip':(mins(t.time)<=nm?'late':'');
+        var s=streak(t);
+        h+='<li><button type="button" class="task '+cls+'" data-act="edit" data-id="'+t.id+'">'
+          +'<span class="time">'+fa(t.time)+'</span>'
+          +'<span class="name">'+esc(t.title)+(s>1?'<span class="streak">'+fa(s)+' روز پیاپی</span>':'')
+          +'<div class="meta">'+fa(t.dur)+' دقیقه · '+esc(repeatText(t))+'</div></span>'
+          +'<span class="st" aria-hidden="true">'+(v==='skip'?CROSS:CHECK)+'</span></button></li>';
+      });
+      h+='</ul>';
+    }
+    document.getElementById('app').innerHTML=h;
+  }
+
+  /* ---------- gate ---------- */
+  function overdueText(t){
+    var d=nowMin()-mins(t.time);
+    if(testId) return 'این یک آزمایش است. چیزی ثبت نمی‌شود.';
+    if(d<=1) return 'وقتش رسید.';
+    if(d<30) return fa(d)+' دقیقه از وقتش گذشته.';
+    if(d<120) return 'نیم ساعت بیشتر گذشته. فقط شروع کن.';
+    return 'خیلی دیر شده، ولی هنوز می‌شود. فقط شروع کن.';
+  }
+  function phaseOf(t){return S.run?S.run.phase:(sureFor===t.id?'sure':'ask')}
+  function gateSig(){var t=dueTask(); return t?phaseOf(t)+'|'+t.id+'|'+(testId?'T':''):''}
+  function renderGate(force){
+    var g=document.getElementById('gate'), t=dueTask(), sig=gateSig();
+    if(!t){g.hidden=true; g.innerHTML=''; lastSig=''; return}
+    if(!force&&sig===lastSig&&!g.hidden) return;
+    lastSig=sig; g.hidden=false;
+    var ph=phaseOf(t), h='<div class="in">';
+    var exit=testId?'<button class="exit" type="button" data-act="exitTest">خروج از آزمایش</button>':'';
+    if(ph==='ask'){
+      h+=exit+'<div class="tag">ساعت '+fa(t.time)+'</div><h2>'+esc(t.title)+'</h2><p id="over">'+esc(overdueText(t))+'</p>'
+        +'<button class="go" type="button" data-act="start" data-id="'+t.id+'">شروع کردم</button>'
+        +'<button class="no" type="button" data-act="nope" data-id="'+t.id+'">امروز نمی‌کنم</button>';
+    }else if(ph==='sure'){
+      h+=exit+'<div class="tag">'+esc(t.title)+'</div><h2>فقط پنج دقیقه.</h2><p>شروع کردن سخت‌ترین بخش است. پنج دقیقه کار کن، بعد خودت تصمیم بگیر.</p>'
+        +'<button class="go" type="button" data-act="mini" data-id="'+t.id+'">باشه، پنج دقیقه</button>'
+        +'<button class="no" type="button" data-act="skip" data-id="'+t.id+'">نه، امروز نمی‌کنم</button>';
+    }else if(ph==='run'){
+      h+=exit+'<div class="tag">در حال انجام</div><h2>'+esc(t.title)+'</h2><div class="clock" id="clock">۰۰:۰۰</div>'
+        +'<button class="go alt" type="button" data-act="early">تمام شد</button>';
+    }else{
+      h+=exit+'<div class="tag">'+esc(t.title)+'</div><h2>انجام شد؟</h2>'
+        +'<div class="two"><button class="go" type="button" data-act="yes" data-id="'+t.id+'">بله</button>'
+        +'<button class="go alt" type="button" data-act="skip" data-id="'+t.id+'">نه</button></div>';
+    }
+    h+='</div>';
+    g.innerHTML=h;
+    if(ph!=='run') Music.stop();
+    tickClock();
+  }
+  function tickClock(){
+    var c=document.getElementById('clock');
+    if(c&&S.run){
+      var left=Math.max(0,Math.round((S.run.end-Date.now())/1000));
+      c.textContent=fa(pad(Math.floor(left/60))+':'+pad(left%60));
+    }
+    var o=document.getElementById('over'), t=dueTask();
+    if(o&&t) o.textContent=overdueText(t);
+  }
+
+  /* ---------- actions ---------- */
+  function begin(id,minutes){
+    S.run={id:id,end:Date.now()+minutes*60000,phase:'run',test:!!testId}; sureFor=null; save(); renderGate(true);
+    Music.start();
+  }
+  function finish(id,v){
+    if(!testId&&!(S.run&&S.run.test)) setLog(id,dk(new Date()),v);
+    S.run=null; sureFor=null; testId=null; Music.stop(); save(); render(); renderGate(true);
+  }
+
+  /* ---------- sheet ---------- */
+  function openSheet(id){
+    var t=id?byId(id):null, hr=new Date().getHours()+1; if(hr>23) hr=23;
+    ed=t?{id:t.id,title:t.title,time:t.time,mode:t.once?'once':(t.days&&t.days.length&&t.days.length<7?'days':'daily'),days:(t.days||[]).slice(),dur:t.dur}
+        :{id:null,title:'',time:pad(hr)+':00',mode:'daily',days:[],dur:15};
+    delArm=false; renderSheet();
+  }
+  function syncEd(){
+    var a=document.getElementById('f-title'), b=document.getElementById('f-time');
+    if(a) ed.title=a.value; if(b&&b.value) ed.time=b.value;
+  }
+  function renderSheet(){
+    var s=document.getElementById('scrim'); s.hidden=false;
+    var h='<div class="sheet" role="dialog" aria-label="کار"><h2>'+(ed.id?'ویرایش کار':'کار جدید')+'</h2>'
+      +'<div class="field"><label for="f-title">چه کاری؟</label><input type="text" id="f-title" maxlength="60" value="'+esc(ed.title)+'" placeholder="مثلاً ورزش"></div>'
+      +'<div class="field"><label for="f-time">ساعت</label><input type="time" id="f-time" value="'+esc(ed.time)+'"></div>'
+      +'<div class="field"><span class="lab">تکرار</span><div class="chips">'
+      +[['daily','هر روز'],['days','روزهای خاص'],['once','فقط امروز']].map(function(m){return '<button type="button" class="chip" data-act="mode" data-v="'+m[0]+'" aria-pressed="'+(ed.mode===m[0])+'">'+m[1]+'</button>'}).join('')
+      +'</div>';
+    if(ed.mode==='days'){
+      h+='<div class="chips" style="margin-top:8px">'+DAYS.map(function(d){return '<button type="button" class="chip day" data-act="day" data-v="'+d[0]+'" aria-pressed="'+(ed.days.indexOf(d[0])>-1)+'" aria-label="'+DAYN[d[0]]+'">'+d[1]+'</button>'}).join('')+'</div>';
+    }
+    h+='</div><div class="field"><span class="lab">مدت انجام کار</span><div class="chips">'
+      +[5,15,30,60].map(function(m){return '<button type="button" class="chip" data-act="dur" data-v="'+m+'" aria-pressed="'+(ed.dur===m)+'">'+fa(m)+' دقیقه</button>'}).join('')
+      +'</div></div>'
+      +'<p class="note">سر ساعت زنگ می‌خورد و بعد از باز کردن برنامه، صفحه تا تصمیم‌گیری بسته نمی‌شود. گزینه «بعداً» وجود ندارد.</p>'
+      +'<button class="btn" type="button" data-act="save">ذخیره</button>';
+    if(ed.id){
+      h+='<button class="btn ghost" type="button" data-act="test">امتحان کن، همین الان</button>'
+        +'<button class="btn danger" type="button" data-act="del">'+(delArm?'مطمئنی؟ دوباره بزن':'حذف کار')+'</button>';
+    }
+    h+='<button class="btn ghost" type="button" data-act="close">بستن</button></div>';
+    s.innerHTML=h;
+    var f=document.getElementById('f-title'); if(f&&!ed.id&&!ed.title){try{f.focus()}catch(e){}}
+  }
+  function closeSheet(){ed=null; var s=document.getElementById('scrim'); s.hidden=true; s.innerHTML=''}
+
+  function saveTask(){
+    syncEd();
+    var title=ed.title.trim();
+    if(!title){var f=document.getElementById('f-title'); f.focus(); f.style.borderColor='var(--bad)'; return}
+    var t=ed.id?byId(ed.id):{id:uid()};
+    t.title=title; t.time=ed.time||'09:00'; t.dur=ed.dur; t.created=Date.now();
+    t.once=ed.mode==='once'?dk(new Date()):null;
+    t.days=ed.mode==='days'?ed.days.slice():[];
+    if(!ed.id) S.tasks.push(t);
+    S.hint=false; closeSheet(); save(); render(); renderGate(true);
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click',function(e){
+    var el=e.target.closest('[data-act]');
+    if(!el){ if(e.target.id==='scrim') closeSheet(); return }
+    var a=el.getAttribute('data-act'), id=el.getAttribute('data-id'), v=el.getAttribute('data-v');
+    if(a==='edit') openSheet(id);
+    else if(a==='hint'){S.hint=false; save(); render()}
+    else if(a==='perm') enableAlarms();
+    else if(a==='music'){S.music=!S.music; save(); if(S.music) Music.preview(); else Music.stop(); render()}
+    else if(a==='mode'){syncEd(); ed.mode=v; renderSheet()}
+    else if(a==='day'){syncEd(); var i=ed.days.indexOf(+v); if(i>-1) ed.days.splice(i,1); else ed.days.push(+v); renderSheet()}
+    else if(a==='dur'){syncEd(); ed.dur=+v; renderSheet()}
+    else if(a==='save') saveTask();
+    else if(a==='close') closeSheet();
+    else if(a==='test'){var tid=ed.id; closeSheet(); testId=tid; S.run=null; sureFor=null; renderGate(true)}
+    else if(a==='del'){
+      if(!delArm){delArm=true; syncEd(); renderSheet()}
+      else{S.tasks=S.tasks.filter(function(t){return t.id!==ed.id}); delete S.log[ed.id]; closeSheet(); save(); render(); renderGate(true)}
+    }
+    else if(a==='start'){var t=byId(id); begin(id,t.dur)}
+    else if(a==='nope'){sureFor=id; renderGate(true)}
+    else if(a==='mini') begin(id,5);
+    else if(a==='skip') finish(id,'skip');
+    else if(a==='yes') finish(id,'done');
+    else if(a==='early'){S.run.phase='confirm'; save(); renderGate(true)}
+    else if(a==='exitTest'){testId=null; S.run=null; sureFor=null; Music.stop(); save(); renderGate(true)}
+  });
+  document.getElementById('add').addEventListener('click',function(){openSheet(null)});
+
+  function tick(){
+    if(S.run&&S.run.phase==='run'&&Date.now()>=S.run.end){S.run.phase='confirm'; save(); renderGate(true); return}
+    if(document.getElementById('gate').hidden||gateSig()!==lastSig) renderGate(false); else tickClock();
+  }
+  var lastMin=-1;
+  setInterval(function(){
+    tick();
+    var m=nowMin(); if(m!==lastMin){lastMin=m; if(!ed) render()}
+  },1000);
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden){tick(); if(!ed) render(); checkPerm(); reschedule()}
+  });
+  if(LN){
+    try{LN.addListener('localNotificationActionPerformed',function(){tick(); if(!ed) render()})}catch(e){}
+  }
+
+  load(); save(); render(); renderGate(true);
+  if(LN){ setupChannel().then(function(){return checkPerm()}).then(function(){ if(perm!=='granted') enableAlarms(); else reschedule() }); }
+})();
+</script>
+</body>
+</html>
