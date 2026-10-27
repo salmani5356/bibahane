@@ -288,7 +288,7 @@ header .date{color:var(--muted); font-size:.95rem}
 
   /* ---------- soft background music (generated, no beat) ---------- */
   var Music={ctx:null,master:null,timer:null,playing:false,idx:3,previewT:null,
-    scale:[220,261.63,293.66,329.63,392,440,523.25,587.33],
+    scale:[261.63,293.66,329.63,392,440,523.25,587.33,659.25],
     ensure:function(){
       if(this.ctx) return true;
       var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
@@ -297,18 +297,19 @@ header .date{color:var(--muted); font-size:.95rem}
       var dl=c.createDelay(1.5); dl.delayTime.value=.46;
       var fb=c.createGain(); fb.gain.value=.38;
       var wet=c.createGain(); wet.gain.value=.5;
-      m.connect(lp); lp.connect(c.destination);
+      var comp=c.createDynamicsCompressor(); lp.connect(comp); comp.connect(c.destination);
+      m.connect(lp);
       m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(lp);
       return true;
     },
     note:function(f,vel){
       var c=this.ctx, t=c.currentTime, g=c.createGain();
       g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(.2*vel,t+.03);
+      g.gain.exponentialRampToValueAtTime(.55*vel,t+.03);
       g.gain.exponentialRampToValueAtTime(.0001,t+4.2);
       var o1=c.createOscillator(); o1.type='sine'; o1.frequency.value=f;
       var o2=c.createOscillator(); o2.type='triangle'; o2.frequency.value=f*2;
-      var g2=c.createGain(); g2.gain.value=.18;
+      var g2=c.createGain(); g2.gain.value=.3;
       o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.master);
       o1.start(t); o2.start(t); o1.stop(t+4.4); o2.stop(t+4.4);
     },
@@ -325,7 +326,7 @@ header .date{color:var(--muted); font-size:.95rem}
       try{this.ctx.resume()}catch(e){}
       this.playing=true;
       this.master.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.master.gain.setTargetAtTime(.35,this.ctx.currentTime,.6);
+      this.master.gain.setTargetAtTime(.9,this.ctx.currentTime,.6);
       this.next();
     },
     stop:function(){
@@ -356,7 +357,7 @@ header .date{color:var(--muted); font-size:.95rem}
     var done=list.filter(function(t){return getLog(t.id,key)==='done'}).length;
     var dateStr=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{weekday:'long',day:'numeric',month:'long'}).format(today);
     var h='<header class="top"><div><h1>بی‌بهانه</h1><div class="date">'+esc(dateStr)+'</div></div>'
-      +'<button class="music" type="button" data-act="music" aria-pressed="'+(!!S.music)+'">موسیقی '+(S.music?'روشن':'خاموش')+'</button></header>';
+      +'<button class="music" type="button" data-act="music" aria-pressed="'+(!!Music.playing)+'">'+(Music.playing?'توقف موسیقی':'پخش موسیقی')+'</button></header>';
     h+='<div class="progress"><div class="bar"><i style="width:'+(list.length?Math.round(done/list.length*100):0)+'%"></i></div><span>'+fa(done)+' از '+fa(list.length)+' انجام شد</span></div>';
     h+='<div class="quote"><div class="lab">جمله امروز</div><p>'+esc(quoteFor(today))+'</p></div>';
     if(LN&&perm!=='granted'&&perm!=='unknown'){
@@ -499,7 +500,10 @@ header .date{color:var(--muted); font-size:.95rem}
     if(a==='edit') openSheet(id);
     else if(a==='hint'){S.hint=false; save(); render()}
     else if(a==='perm') enableAlarms();
-    else if(a==='music'){S.music=!S.music; save(); if(S.music) Music.preview(); else Music.stop(); render()}
+    else if(a==='music'){
+      if(Music.playing){S.music=false; Music.stop()} else {S.music=true; Music.start()}
+      save(); render();
+    }
     else if(a==='mode'){syncEd(); ed.mode=v; renderSheet()}
     else if(a==='day'){syncEd(); var i=ed.days.indexOf(+v); if(i>-1) ed.days.splice(i,1); else ed.days.push(+v); renderSheet()}
     else if(a==='dur'){syncEd(); ed.dur=+v; renderSheet()}
