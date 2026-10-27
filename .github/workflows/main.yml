@@ -1,11 +1,12 @@
 name: Build APK
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,11 +20,32 @@ jobs:
       - run: npx cap add android
       - name: Allow exact alarms
         run: sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />#' android/app/src/main/AndroidManifest.xml
+      - name: App icons
+        run: |
+          if [ -d res-overrides ]; then cp -r res-overrides/. android/app/src/main/res/; else echo "res-overrides folder is missing"; exit 1; fi
+      - name: Version number
+        run: sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
       - run: npx cap sync android
       - run: chmod +x android/gradlew
-      - run: ./gradlew assembleDebug
+      - name: Build release
+        run: ./gradlew assembleRelease
         working-directory: android
+      - name: Sign APK
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "Secrets KEYSTORE_BASE64 and KEYSTORE_PASSWORD are missing."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > release-key.jks
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks release-key.jks --ks-key-alias bibahane \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --v1-signing-enabled true --v2-signing-enabled true \
+            --out bibahane.apk aligned.apk
+          "$BT/apksigner" verify --verbose bibahane.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: bibahane-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: bibahane-release-apk
+          path: bibahane.apk
