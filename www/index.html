@@ -57,6 +57,9 @@ header .date{color:var(--muted); font-size:.95rem}
 .quote .lab{font-size:.78rem; color:var(--muted); letter-spacing:.02em}
 .quote p{margin:4px 0 0; font-size:1.08rem; font-weight:700; text-wrap:balance}
 
+.tracks{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.tracks .lab{font-size:.85rem; color:var(--muted)}
+.chip.tr{padding:6px 12px; font-size:.88rem}
 .hint{background:var(--surface); border:1px dashed var(--line); border-radius:12px; padding:12px 14px; display:flex; gap:12px; align-items:center; justify-content:space-between; font-size:.9rem; color:var(--muted)}
 .hint button{background:none; border:0; color:var(--accent); font-weight:700; padding:6px 8px; white-space:nowrap}
 .hint.warn{border-color:var(--warn); color:var(--ink)}
@@ -196,6 +199,7 @@ header .date{color:var(--muted); font-size:.95rem}
     try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
     if(!S||!S.tasks){S={tasks:seed(),log:{},run:null,hint:true,music:true}}
     if(S.music===undefined) S.music=true;
+    if(!S.track) S.track='piano';
   }
   var schedT=null;
   function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} clearTimeout(schedT); schedT=setTimeout(reschedule,400)}
@@ -286,22 +290,33 @@ header .date{color:var(--muted); font-size:.95rem}
     if(again){again=false; reschedule()}
   }
 
-  /* ---------- soft background music (generated, no beat) ---------- */
-  var Music={ctx:null,master:null,timer:null,playing:false,idx:3,previewT:null,
+  /* ---------- soft background music (generated inside the app: no beat, no vocals) ---------- */
+  var TRACKS=[['piano','پیانو آرام'],['guitar','گیتار ملایم'],['pad','فضای آرام'],['rain','باران'],['sea','موج دریا']];
+  var Music={ctx:null,master:null,dry:null,bus:null,timer:null,playing:false,idx:3,gi:3,ci:0,srcs:[],kbuf:{},
     scale:[261.63,293.66,329.63,392,440,523.25,587.33,659.25],
+    gscale:[196,220,261.63,293.66,329.63,392,440,523.25],
+    chords:[[220,261.63,329.63],[174.61,220,261.63],[196,261.63,329.63],[196,246.94,293.66]],
     ensure:function(){
       if(this.ctx) return true;
       var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
-      var c=this.ctx=new AC(), m=this.master=c.createGain(); m.gain.value=0;
-      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200;
+      var c=this.ctx=new AC();
+      var comp=c.createDynamicsCompressor(); comp.connect(c.destination);
+      var dry=this.dry=c.createGain(); dry.connect(comp);
+      var m=this.master=c.createGain();
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2400; lp.connect(comp);
       var dl=c.createDelay(1.5); dl.delayTime.value=.46;
       var fb=c.createGain(); fb.gain.value=.38;
       var wet=c.createGain(); wet.gain.value=.5;
-      var comp=c.createDynamicsCompressor(); lp.connect(comp); comp.connect(c.destination);
-      m.connect(lp);
-      m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(lp);
+      m.connect(lp); m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(lp);
       return true;
     },
+    track:function(){return S.track||'piano'},
+    noise:function(sec){
+      var c=this.ctx, n=Math.floor(c.sampleRate*sec), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+      for(var i=0;i<n;i++) d[i]=Math.random()*2-1;
+      return b;
+    },
+    /* piano */
     note:function(f,vel){
       var c=this.ctx, t=c.currentTime, g=c.createGain();
       g.gain.setValueAtTime(0.0001,t);
@@ -310,33 +325,102 @@ header .date{color:var(--muted); font-size:.95rem}
       var o1=c.createOscillator(); o1.type='sine'; o1.frequency.value=f;
       var o2=c.createOscillator(); o2.type='triangle'; o2.frequency.value=f*2;
       var g2=c.createGain(); g2.gain.value=.3;
-      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.master);
+      o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(this.bus);
       o1.start(t); o2.start(t); o1.stop(t+4.4); o2.stop(t+4.4);
     },
-    next:function(){
+    nextPiano:function(){
       if(!this.playing) return;
       var step=[-2,-1,-1,1,1,2][Math.floor(Math.random()*6)];
       this.idx=Math.max(0,Math.min(this.scale.length-1,this.idx+step));
       this.note(this.scale[this.idx],.7+Math.random()*.3);
       if(Math.random()<.22) this.note(this.scale[Math.max(0,this.idx-2)],.5);
-      var self=this; this.timer=setTimeout(function(){self.next()},1900+Math.random()*2600);
+      var self=this; this.timer=setTimeout(function(){self.nextPiano()},1900+Math.random()*2600);
+    },
+    /* guitar (plucked string) */
+    pluckBuf:function(f){
+      if(this.kbuf[f]) return this.kbuf[f];
+      var c=this.ctx, sr=c.sampleRate, n=Math.floor(sr*3), buf=c.createBuffer(1,n,sr), d=buf.getChannelData(0);
+      var N=Math.max(2,Math.round(sr/f)), line=new Float32Array(N), i, p=0;
+      for(i=0;i<N;i++) line[i]=(Math.random()*2-1)*.8;
+      for(i=0;i<n;i++){ var a=line[p], b=line[(p+1)%N]; d[i]=a; line[p]=.5*(a+b)*.996; p=(p+1)%N; }
+      this.kbuf[f]=buf; return buf;
+    },
+    pluck:function(f,vel){
+      var c=this.ctx, s=c.createBufferSource(); s.buffer=this.pluckBuf(f);
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800;
+      var g=c.createGain(); g.gain.value=.55*vel;
+      s.connect(lp); lp.connect(g); g.connect(this.bus); s.start();
+    },
+    nextGuitar:function(){
+      if(!this.playing) return;
+      var step=[-2,-1,-1,1,1,2][Math.floor(Math.random()*6)];
+      this.gi=Math.max(0,Math.min(this.gscale.length-1,this.gi+step));
+      this.pluck(this.gscale[this.gi],.8);
+      if(Math.random()<.3) this.pluck(this.gscale[Math.max(0,this.gi-2)],.5);
+      var self=this; this.timer=setTimeout(function(){self.nextGuitar()},1300+Math.random()*1900);
+    },
+    /* soft pad: slow chords */
+    nextPad:function(){
+      if(!this.playing) return;
+      var c=this.ctx, t=c.currentTime, ch=this.chords[this.ci%this.chords.length], self=this; this.ci++;
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400; lp.connect(this.bus);
+      ch.forEach(function(f,i){
+        [['sine',0,.11],['triangle',5,.05]].forEach(function(o){
+          var osc=c.createOscillator(); osc.type=o[0]; osc.frequency.value=f; osc.detune.value=o[1]+(i-1)*3;
+          var g=c.createGain(); g.gain.setValueAtTime(0.0001,t);
+          g.gain.linearRampToValueAtTime(o[2],t+3.5);
+          g.gain.linearRampToValueAtTime(0.0001,t+11);
+          osc.connect(g); g.connect(lp); osc.start(t); osc.stop(t+11.5); self.srcs.push(osc);
+        });
+      });
+      if(this.srcs.length>30) this.srcs=this.srcs.slice(-18);
+      this.timer=setTimeout(function(){self.nextPad()},8500);
+    },
+    /* rain */
+    rain:function(){
+      var c=this.ctx, s1=c.createBufferSource(); s1.buffer=this.noise(4); s1.loop=true;
+      var hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=700;
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=7000;
+      var g1=c.createGain(); g1.gain.value=1;
+      s1.connect(hp); hp.connect(lp); lp.connect(g1); g1.connect(this.bus); s1.start();
+      var s2=c.createBufferSource(); s2.buffer=this.noise(5); s2.loop=true;
+      var bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=300; bp.Q.value=.6;
+      var g2=c.createGain(); g2.gain.value=3;
+      s2.connect(bp); bp.connect(g2); g2.connect(this.bus); s2.start();
+      this.srcs.push(s1,s2);
+    },
+    /* sea waves */
+    sea:function(){
+      var c=this.ctx, s=c.createBufferSource(); s.buffer=this.noise(6); s.loop=true;
+      var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=520;
+      var g=c.createGain(); g.gain.value=1.2;
+      var lfo=c.createOscillator(); lfo.frequency.value=.09;
+      var lg=c.createGain(); lg.gain.value=.9;
+      lfo.connect(lg); lg.connect(g.gain);
+      s.connect(lp); lp.connect(g); g.connect(this.bus); s.start(); lfo.start();
+      this.srcs.push(s,lfo);
     },
     start:function(){
       if(!S.music||this.playing||!this.ensure()) return;
       try{this.ctx.resume()}catch(e){}
+      var c=this.ctx, t=this.track(), noisy=(t==='rain'||t==='sea');
+      var bus=this.bus=c.createGain(); bus.gain.value=0;
+      bus.connect(noisy?this.dry:this.master);
+      var lvl={piano:.9,guitar:1,pad:.8,rain:.55,sea:.7}[t]||.8;
+      bus.gain.setTargetAtTime(lvl,c.currentTime,.6);
       this.playing=true;
-      this.master.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.master.gain.setTargetAtTime(.9,this.ctx.currentTime,.6);
-      this.next();
+      if(t==='guitar') this.nextGuitar();
+      else if(t==='pad') this.nextPad();
+      else if(t==='rain') this.rain();
+      else if(t==='sea') this.sea();
+      else this.nextPiano();
     },
     stop:function(){
       if(!this.playing) return;
-      this.playing=false; clearTimeout(this.timer); clearTimeout(this.previewT);
-      try{this.master.gain.setTargetAtTime(0,this.ctx.currentTime,.5)}catch(e){}
-    },
-    preview:function(){
-      this.start(); var self=this; clearTimeout(this.previewT);
-      this.previewT=setTimeout(function(){ if(!(S.run&&S.run.phase==='run')) self.stop() },15000);
+      this.playing=false; clearTimeout(this.timer);
+      var bus=this.bus, srcs=this.srcs; this.srcs=[]; this.bus=null;
+      try{bus.gain.cancelScheduledValues(this.ctx.currentTime); bus.gain.setTargetAtTime(0,this.ctx.currentTime,.25)}catch(e){}
+      setTimeout(function(){ srcs.forEach(function(n){try{n.stop()}catch(e){}}); try{bus.disconnect()}catch(e){} },1500);
     }
   };
 
@@ -360,6 +444,7 @@ header .date{color:var(--muted); font-size:.95rem}
       +'<button class="music" type="button" data-act="music" aria-pressed="'+(!!Music.playing)+'">'+(Music.playing?'توقف موسیقی':'پخش موسیقی')+'</button></header>';
     h+='<div class="progress"><div class="bar"><i style="width:'+(list.length?Math.round(done/list.length*100):0)+'%"></i></div><span>'+fa(done)+' از '+fa(list.length)+' انجام شد</span></div>';
     h+='<div class="quote"><div class="lab">جمله امروز</div><p>'+esc(quoteFor(today))+'</p></div>';
+    h+='<div class="tracks" role="group" aria-label="انتخاب موسیقی"><span class="lab">موسیقی</span>'+TRACKS.map(function(t){return '<button type="button" class="chip tr" data-act="track" data-v="'+t[0]+'" aria-pressed="'+(S.track===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
     if(LN&&perm!=='granted'&&perm!=='unknown'){
       h+='<div class="hint warn"><span>برای اینکه سر وقت زنگ بزنه، اجازه نوتیفیکیشن و آلارم لازمه.</span><button type="button" data-act="perm">فعال‌سازی</button></div>';
     }
@@ -500,6 +585,7 @@ header .date{color:var(--muted); font-size:.95rem}
     if(a==='edit') openSheet(id);
     else if(a==='hint'){S.hint=false; save(); render()}
     else if(a==='perm') enableAlarms();
+    else if(a==='track'){var was=Music.playing; S.track=v; S.music=true; if(was) Music.stop(); Music.start(); save(); render()}
     else if(a==='music'){
       if(Music.playing){S.music=false; Music.stop()} else {S.music=true; Music.start()}
       save(); render();
