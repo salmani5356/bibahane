@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEYSTORE_PASSWORD: pRUE969pFkK0Ub3nSNs2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,11 +32,13 @@ jobs:
         working-directory: android
       - name: Sign APK
         run: |
-          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
-            echo "Secrets KEYSTORE_BASE64 and KEYSTORE_PASSWORD are missing."
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Secret KEYSTORE_BASE64 is missing."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > release-key.jks
+          echo "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > release-key.jks
+          echo "keystore bytes: $(wc -c < release-key.jks)"
+          echo "keystore sha256: $(sha256sum release-key.jks | cut -d' ' -f1)"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           UNSIGNED=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
           "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
