@@ -80,6 +80,16 @@ header .date{color:var(--muted); font-size:.95rem}
 .streak{display:inline-block; margin-inline-start:8px; padding:0 8px; border-radius:99px; font-size:.78rem; font-weight:700; color:var(--accent); border:1px solid var(--accent)}
 .empty{padding:28px 16px; text-align:center; color:var(--muted); background:var(--surface); border:1px dashed var(--line); border-radius:14px}
 
+.about{margin-top:6px; padding-top:16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:8px; font-size:.92rem}
+.about .lab{font-size:.78rem; color:var(--muted); letter-spacing:.02em}
+.about .r{display:flex; justify-content:space-between; gap:12px; align-items:baseline; min-width:0}
+.about .r span{color:var(--muted)}
+.about a{color:var(--accent); font-weight:700; text-decoration:none; overflow-wrap:anywhere; direction:ltr; unicode-bidi:plaintext}
+.linkbtn{align-self:flex-start; background:none; border:0; padding:6px 0; color:var(--accent); font-weight:700; text-decoration:underline; text-underline-offset:4px}
+.policy h2{margin:0}
+.policy h3{margin:14px 0 2px; font-size:1rem}
+.policy p,.policy li{margin:0; color:var(--muted); font-size:.92rem; line-height:1.9}
+.policy ul{margin:0; padding-inline-start:20px}
 .dock{position:fixed; inset-inline:0; bottom:0; padding:12px max(16px, env(safe-area-inset-left, 0px)) calc(12px + env(safe-area-inset-bottom, 0px));
   background:linear-gradient(to top, var(--bg) 70%, transparent)}
 .dock .in{max-width:560px; margin:0 auto}
@@ -245,7 +255,17 @@ header .date{color:var(--muted); font-size:.95rem}
   /* ---------- offline alarms (native) ---------- */
   async function setupChannel(){
     if(!LN) return;
-    try{await LN.createChannel({id:'alarm',name:'یادآور کارها',description:'زنگ و هشدار کارهای روزانه',importance:5,visibility:1,vibration:true})}catch(e){}
+    try{await LN.deleteChannel({id:'alarm'})}catch(e){}
+    for(var i=0;i<ALARMS.length;i++){
+      var a=ALARMS[i];
+      try{await LN.createChannel({id:'al_'+a[0],name:'یادآور: '+a[1],description:'زنگ و هشدار کارهای روزانه',importance:5,visibility:1,vibration:true,sound:'alarm_'+a[0]+'.ogg'})}catch(e){}
+    }
+  }
+  var ALARMS=[['bell','زنگ بلند (پیشنهادی)'],['loud','بوق هشدار'],['soft','ملایم و رو‌به‌افزایش']];
+  function alarmId(){var v=S.alarm||'bell'; return 'al_'+v}
+  var prevA=null;
+  function previewAlarm(v){
+    try{if(prevA){prevA.pause()} prevA=new Audio('sounds/alarm_'+v+'.ogg'); prevA.volume=1; prevA.play(); setTimeout(function(){try{prevA.pause()}catch(e){}},6000)}catch(e){}
   }
   async function checkPerm(){
     if(!LN) return;
@@ -274,12 +294,12 @@ header .date{color:var(--muted); font-size:.95rem}
           if(off===0&&(getLog(t.id,dk(d))||!startsToday(t))) return;
           var hm=t.time.split(':'), at=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+hm[0],+hm[1],0);
           if(at.getTime()>now){
-            out.push({id:id++,title:t.title,body:quoteFor(d),channelId:'alarm',schedule:{at:at,allowWhileIdle:true},extra:{taskId:t.id}});
+            out.push({id:id++,title:t.title,body:quoteFor(d),channelId:alarmId(),sound:'alarm_'+(S.alarm||'bell')+'.ogg',schedule:{at:at,allowWhileIdle:true},extra:{taskId:t.id}});
           }
           if(off<=2){
             [10,20].forEach(function(m){
               var a2=new Date(at.getTime()+m*60000);
-              if(a2.getTime()>now) out.push({id:id++,title:'هنوز شروع نکردی: '+t.title,body:'فقط پنج دقیقه. برنامه رو باز کن.',channelId:'alarm',schedule:{at:a2,allowWhileIdle:true},extra:{taskId:t.id}});
+              if(a2.getTime()>now) out.push({id:id++,title:'هنوز شروع نکردی: '+t.title,body:'فقط پنج دقیقه. برنامه رو باز کن.',channelId:alarmId(),sound:'alarm_'+(S.alarm||'bell')+'.ogg',schedule:{at:a2,allowWhileIdle:true},extra:{taskId:t.id}});
             });
           }
         });
@@ -292,6 +312,12 @@ header .date{color:var(--muted); font-size:.95rem}
 
   /* ---------- soft background music (generated inside the app: no beat, no vocals) ---------- */
   var TRACKS=[['piano','پیانو آرام'],['guitar','گیتار ملایم'],['pad','فضای آرام'],['rain','باران'],['sea','موج دریا']];
+  var FILES={};
+  var fileAud=null, mineUrl=null;
+  function idb(mode,fn){return new Promise(function(res,rej){try{var r=indexedDB.open('bibahane',1);r.onupgradeneeded=function(){r.result.createObjectStore('f')};r.onsuccess=function(){var tx=r.result.transaction('f',mode),st=tx.objectStore('f'),q=fn(st);tx.oncomplete=function(){res(q&&q.result)};tx.onerror=function(){rej()}};r.onerror=function(){rej()}}catch(e){rej()}})}
+  function playFile(url){
+    try{fileAud=new Audio(url); fileAud.loop=true; fileAud.volume=0; var a=fileAud; a.play().catch(function(){}); var v=0, iv=setInterval(function(){v=Math.min(.85,v+.05); try{a.volume=v}catch(e){} if(v>=.85||a!==fileAud) clearInterval(iv)},120)}catch(e){}
+  }
   var Music={ctx:null,master:null,dry:null,bus:null,timer:null,playing:false,idx:3,gi:3,ci:0,srcs:[],kbuf:{},
     scale:[261.63,293.66,329.63,392,440,523.25,587.33,659.25],
     gscale:[196,220,261.63,293.66,329.63,392,440,523.25],
@@ -308,6 +334,12 @@ header .date{color:var(--muted); font-size:.95rem}
       var fb=c.createGain(); fb.gain.value=.38;
       var wet=c.createGain(); wet.gain.value=.5;
       m.connect(lp); m.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(lp);
+      try{ /* reverb: generated hall impulse */
+        var rl=Math.floor(c.sampleRate*3.2), ib=c.createBuffer(2,rl,c.sampleRate);
+        for(var ch=0;ch<2;ch++){var id=ib.getChannelData(ch); for(var i=0;i<rl;i++){var t=i/rl; id[i]=(Math.random()*2-1)*Math.pow(1-t,2.6)*(t<.01?t*100:1)}}
+        var cv=c.createConvolver(); cv.buffer=ib; var rw=c.createGain(); rw.gain.value=.55;
+        m.connect(cv); cv.connect(rw); rw.connect(lp);
+      }catch(e){}
       return true;
     },
     track:function(){return S.track||'piano'},
@@ -401,6 +433,11 @@ header .date{color:var(--muted); font-size:.95rem}
       this.srcs.push(s,lfo);
     },
     start:function(){
+      if(S.music&&!this.playing){
+        var tt=S.track;
+        if(FILES[tt]){this.playing=true; playFile(FILES[tt]); return}
+        if(tt==='mine'){this.playing=true; var self=this; idb('readonly',function(st){return st.get('mine')}).then(function(b){ if(!self.playing) return; if(!b){self.playing=false; return} if(mineUrl) URL.revokeObjectURL(mineUrl); mineUrl=URL.createObjectURL(b); playFile(mineUrl)}).catch(function(){self.playing=false}); return}
+      }
       if(!S.music||this.playing||!this.ensure()) return;
       try{this.ctx.resume()}catch(e){}
       var c=this.ctx, t=this.track(), noisy=(t==='rain'||t==='sea');
@@ -418,6 +455,8 @@ header .date{color:var(--muted); font-size:.95rem}
     stop:function(){
       if(!this.playing) return;
       this.playing=false; clearTimeout(this.timer);
+      if(fileAud){try{fileAud.pause()}catch(e){} fileAud=null}
+      if(!this.bus) return;
       var bus=this.bus, srcs=this.srcs; this.srcs=[]; this.bus=null;
       try{bus.gain.cancelScheduledValues(this.ctx.currentTime); bus.gain.setTargetAtTime(0,this.ctx.currentTime,.25)}catch(e){}
       setTimeout(function(){ srcs.forEach(function(n){try{n.stop()}catch(e){}}); try{bus.disconnect()}catch(e){} },1500);
@@ -444,7 +483,7 @@ header .date{color:var(--muted); font-size:.95rem}
       +'<button class="music" type="button" data-act="music" aria-pressed="'+(!!Music.playing)+'">'+(Music.playing?'توقف موسیقی':'پخش موسیقی')+'</button></header>';
     h+='<div class="progress"><div class="bar"><i style="width:'+(list.length?Math.round(done/list.length*100):0)+'%"></i></div><span>'+fa(done)+' از '+fa(list.length)+' انجام شد</span></div>';
     h+='<div class="quote"><div class="lab">جمله امروز</div><p>'+esc(quoteFor(today))+'</p></div>';
-    h+='<div class="tracks" role="group" aria-label="انتخاب موسیقی"><span class="lab">موسیقی</span>'+TRACKS.map(function(t){return '<button type="button" class="chip tr" data-act="track" data-v="'+t[0]+'" aria-pressed="'+(S.track===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
+    h+='<div class="tracks" role="group" aria-label="انتخاب موسیقی"><span class="lab">موسیقی</span>'+TRACKS.map(function(t){return '<button type="button" class="chip tr" data-act="track" data-v="'+t[0]+'" aria-pressed="'+(S.track===t[0])+'">'+t[1]+'</button>'}).join('')+'<button type="button" class="chip tr" data-act="mine" aria-pressed="'+(S.track==='mine')+'">'+(S.mineName?esc(S.mineName):'+ آهنگ خودم')+'</button><input type="file" id="pick" accept="audio/*" hidden></div>';
     if(LN&&perm!=='granted'&&perm!=='unknown'){
       h+='<div class="hint warn"><span>برای اینکه سر وقت زنگ بزنه، اجازه نوتیفیکیشن و آلارم لازمه.</span><button type="button" data-act="perm">فعال‌سازی</button></div>';
     }
@@ -466,6 +505,11 @@ header .date{color:var(--muted); font-size:.95rem}
       });
       h+='</ul>';
     }
+    h+='<div class="tracks" role="group" aria-label="صدای زنگ یادآور"><span class="lab">صدای زنگ</span>'+ALARMS.map(function(t){return '<button type="button" class="chip tr" data-act="alarm" data-v="'+t[0]+'" aria-pressed="'+((S.alarm||'bell')===t[0])+'">'+t[1]+'</button>'}).join('')+'</div>';
+    h+='<div class="about"><div class="lab">ارتباط با ما</div>'
+      +'<div class="r"><span>ایمیل</span><a href="mailto:rooz.studio.app@gmail.com">rooz.studio.app@gmail.com</a></div>'
+      +'<div class="r"><span>تلگرام</span><a href="https://t.me/RoozStudio_Support" target="_blank" rel="noopener">t.me/RoozStudio_Support</a></div>'
+      +'<button type="button" class="linkbtn" data-act="privacy">سیاست حریم خصوصی</button></div>';
     document.getElementById('app').innerHTML=h;
   }
 
@@ -563,6 +607,19 @@ header .date{color:var(--muted); font-size:.95rem}
     s.innerHTML=h;
     var f=document.getElementById('f-title'); if(f&&!ed.id&&!ed.title){try{f.focus()}catch(e){}}
   }
+  function showPrivacy(){
+    var s=document.getElementById('scrim'); s.hidden=false;
+    s.innerHTML='<div class="sheet policy" role="dialog" aria-label="سیاست حریم خصوصی"><h2>سیاست حریم خصوصی بی‌بهانه</h2>'
+      +'<p>آخرین به‌روزرسانی: ۲۵ آبان ۱۴۰۵</p>'
+      +'<h3>چه چیزی ذخیره می‌شود</h3><p>عنوان کارها، ساعت و تکرارشان، سابقه «انجام شد» یا «امروز نمی‌کنم» و انتخاب موسیقی. همه این‌ها فقط در حافظه خود برنامه روی همین گوشی می‌ماند.</p>'
+      +'<h3>چه چیزی ارسال نمی‌شود</h3><p>هیچ اطلاعاتی به سرور یا شخص ثالث فرستاده نمی‌شود. برنامه حساب کاربری ندارد و برای کار کردن به اینترنت نیاز ندارد.</p>'
+      +'<h3>تبلیغ و آمارگیر</h3><p>برنامه هیچ تبلیغی ندارد و هیچ ابزار آمارگیری یا تحلیل (مثل تپسل، ادیوری یا گوگل آنالیتیکس) در آن نیست.</p>'
+      +'<h3>دسترسی‌ها و دلیلشان</h3><ul><li>نوتیفیکیشن: نمایش یادآور سر ساعت</li><li>آلارم دقیق: زنگ خوردن سر وقت</li><li>اجرا بعد از روشن شدن گوشی: چیدن دوباره آلارم‌ها بعد از ریستارت</li><li>بیدار نگه داشتن گوشی: نمایش هشدار هنگام زنگ</li></ul>'
+      +'<h3>کودکان</h3><p>برنامه اطلاعات شخصی هیچ کاربری، از جمله کودکان، را جمع نمی‌کند.</p>'
+      +'<h3>حذف اطلاعات</h3><p>با پاک کردن برنامه یا پاک کردن اطلاعات آن از تنظیمات گوشی، همه چیز حذف می‌شود.</p>'
+      +'<h3>ارتباط با ما</h3><p>ایمیل: rooz.studio.app@gmail.com<br>تلگرام: t.me/RoozStudio_Support</p>'
+      +'<button class="btn ghost" type="button" data-act="close">بستن</button></div>';
+  }
   function closeSheet(){ed=null; var s=document.getElementById('scrim'); s.hidden=true; s.innerHTML=''}
 
   function saveTask(){
@@ -585,6 +642,9 @@ header .date{color:var(--muted); font-size:.95rem}
     if(a==='edit') openSheet(id);
     else if(a==='hint'){S.hint=false; save(); render()}
     else if(a==='perm') enableAlarms();
+    else if(a==='privacy') showPrivacy();
+    else if(a==='mine'){var pk=document.getElementById('pick'); if(pk) pk.click()}
+    else if(a==='alarm'){S.alarm=v; previewAlarm(v); save(); setupChannel(); render()}
     else if(a==='track'){var was=Music.playing; S.track=v; S.music=true; if(was) Music.stop(); Music.start(); save(); render()}
     else if(a==='music'){
       if(Music.playing){S.music=false; Music.stop()} else {S.music=true; Music.start()}
@@ -626,6 +686,12 @@ header .date{color:var(--muted); font-size:.95rem}
     try{LN.addListener('localNotificationActionPerformed',function(){tick(); if(!ed) render()})}catch(e){}
   }
 
+  document.addEventListener('change',function(e){
+    var f=e.target&&e.target.id==='pick'&&e.target.files&&e.target.files[0]; if(!f) return;
+    idb('readwrite',function(st){return st.put(f,'mine')}).then(function(){
+      var was=Music.playing; if(was) Music.stop(); S.track='mine'; S.music=true; S.mineName=(f.name||'آهنگ من').replace(/\.[^.]+$/,'').slice(0,18); Music.start(); save(); render();
+    }).catch(function(){});
+  });
   load(); save(); render(); renderGate(true);
   if(LN){ setupChannel().then(function(){return checkPerm()}).then(function(){ if(perm!=='granted') enableAlarms(); else reschedule() }); }
 })();
